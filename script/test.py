@@ -5,16 +5,18 @@
 """
 
 import rospy
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, Twist
 
 import asyncio
 import xml.etree.ElementTree as ET
-import pkg_resources
 import signal
+from scipy.spatial.transform import Rotation as R
+import numpy as np
 
 import qtm
 
-QTM_FILE = pkg_resources.resource_filename("qtm", "data/L_dynamique6y200dis1_0026.qtm")
+QTM_FILE = "L_dynamique6y200dis1_0026.qtm"
+wanted_body = "BriceRigidBody"
 connection = None
 
 def create_body_index(xml_string):
@@ -34,7 +36,7 @@ def body_enabled_count(xml_string):
 async def main():
     global connection
     # Connect to qtm
-    connection = await qtm.connect("Dragonfly.local")
+    connection = await qtm.connect("192.168.1.2")
 
     # Connection failed?
     if connection is None:
@@ -42,19 +44,19 @@ async def main():
         return
 
     # Take control of qtm, context manager will automatically release control after scope end
-    # async with qtm.TakeControl(connection, "password"):
+    async with qtm.TakeControl(connection, "password"):
 
-    #     realtime = False
+        realtime = False
 
-    #     if realtime:
-    #         # Start new realtime
-    #         await connection.new()
-    #     else:
-    #         # Load qtm file
-    #         await connection.load(QTM_FILE)
+        if realtime:
+            # Start new realtime
+            await connection.new()
+        else:
+            # Load qtm file
+            # await connection.load(QTM_FILE)
 
-    #         # start rtfromfile
-    #         await connection.start(rtfromfile=True)
+            # start rtfromfile
+            await connection.start(rtfromfile=True)
 
     # Get 6dof settings from qtm
     xml_string = await connection.get_parameters(parameters=["6d"])
@@ -62,10 +64,8 @@ async def main():
 
     print("{} of {} 6DoF bodies enabled".format(body_enabled_count(xml_string), len(body_index)))
 
-    wanted_body = "BriceRigidBody"
-
     def on_packet(packet):
-        info, bodies = packet.get_6d()
+        _, bodies = packet.get_6d()
         # print(
         #     "Framenumber: {} - Body count: {}".format(
         #         packet.framenumber, info.body_count
@@ -82,22 +82,21 @@ async def main():
             # for position, rotation in bodies:
                 # print("Pos: {} - Rot: {}".format(position, rotation))
                 
-        pos, rot = bodies[0]
-        data = Point()
-        data.x = pos.x
-        data.y = pos.y
-        data.z = pos.z
-        
-        
-        
-                
-        pub.publish(data)
+        pos, rot = bodies[0]           
+        pose = Twist()
+        pose.linear.x = pos.x      
+        pose.linear.y = pos.y
+        pose.linear.z = pos.z
+        r = R.from_matrix(np.array(rot).reshape((3, 3)))
+        # print(pose)
+        r = r.as_euler('xyz')
+        pose.angular.x = r[0]
+        pose.angular.y = r[1]
+        pose.angular.z = r[2]
+        pub_pose.publish(pose)
 
     # Start streaming frames
     await connection.stream_frames(components=["6d"], on_packet=on_packet)
-
-    # Wait asynchronously 5 seconds
-    # await asyncio.sleep(60)
     
     
 def stop(*args, **kwargs):
@@ -108,8 +107,8 @@ def stop(*args, **kwargs):
 if __name__ == "__main__":
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    rospy.init_node("qtm_6dof_position")
-    pub = rospy.Publisher("qtm_6dof_position", Point , queue_size=10)
+    rospy.init_node("qtm")
+    pub_pose = rospy.Publisher("qtm/6dof_pose", Twist , queue_size=10)
     # Run our asynchronous function until complete
     asyncio.ensure_future(main())
     asyncio.get_event_loop().run_forever()
