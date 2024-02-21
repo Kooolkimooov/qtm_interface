@@ -15,7 +15,6 @@ import numpy as np
 
 import qtm
 
-QTM_FILE = "L_dynamique6y200dis1_0026.qtm"
 QTM_IP = "10.21.117.108"
 BODY_NAME = "BriceRigidBody"
 connection = None
