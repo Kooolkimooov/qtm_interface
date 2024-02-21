@@ -5,7 +5,7 @@
 """
 
 import rospy
-from geometry_msgs.msg import Point, Twist
+from geometry_msgs.msg import Twist
 
 import asyncio
 import xml.etree.ElementTree as ET
@@ -62,34 +62,16 @@ async def main():
     xml_string = await connection.get_parameters(parameters=["6d"])
     body_index = create_body_index(xml_string)
 
-    print("{} of {} 6DoF bodies enabled".format(body_enabled_count(xml_string), len(body_index)))
-
     def on_packet(packet):
         _, bodies = packet.get_6d()
-        # print(
-        #     "Framenumber: {} - Body count: {}".format(
-        #         packet.framenumber, info.body_count
-        #     )
-        # )
-
-        # if wanted_body is not None and wanted_body in body_index:
-            # Extract one specific body
-            # wanted_index = body_index[wanted_body]
-            # position, rotation = bodies[wanted_index]
-            # print("{} - Pos: {} - Rot: {}".format(wanted_body, position, rotation))
-        # else:
-            # Print all bodies
-            # for position, rotation in bodies:
-                # print("Pos: {} - Rot: {}".format(position, rotation))
-                
-        pos, rot = bodies[0]           
+        wanted_index = body_index[BODY_NAME] 
+        pos, rot = bodies[wanted_index]           
         pose = Twist()
         pose.linear.x = pos.x      
         pose.linear.y = pos.y
         pose.linear.z = pos.z
-        r = R.from_matrix(np.array(rot).reshape((3, 3)))
+        r = R.from_matrix(np.array(rot).reshape((3, 3))).as_euler('xyz')
         # print(pose)
-        r = r.as_euler('xyz')
         pose.angular.x = r[0]
         pose.angular.y = r[1]
         pose.angular.z = r[2]
