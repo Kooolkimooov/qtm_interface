@@ -16,7 +16,8 @@ import numpy as np
 import qtm
 
 QTM_FILE = "L_dynamique6y200dis1_0026.qtm"
-wanted_body = "BriceRigidBody"
+QTM_IP = "10.21.117.108"
+BODY_NAME = "BriceRigidBody"
 connection = None
 
 def create_body_index(xml_string):
@@ -36,11 +37,11 @@ def body_enabled_count(xml_string):
 async def main():
     global connection
     # Connect to qtm
-    connection = await qtm.connect("192.168.1.2")
+    connection = await qtm.connect(QTM_IP)
 
     # Connection failed?
     if connection is None:
-        print("Failed to connect")
+        rospy.ERROR("Failed to connect")
         return
 
     # Take control of qtm, context manager will automatically release control after scope end
@@ -107,8 +108,8 @@ def stop(*args, **kwargs):
 if __name__ == "__main__":
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    rospy.init_node("qtm")
-    pub_pose = rospy.Publisher("qtm/6dof_pose", Twist , queue_size=10)
+    qtm_node = rospy.init_node("qtm")
+    pub_pose = rospy.Publisher(f"qtm/{BODY_NAME}/6dof_pose", Twist , queue_size=10)
     # Run our asynchronous function until complete
     asyncio.ensure_future(main())
     asyncio.get_event_loop().run_forever()

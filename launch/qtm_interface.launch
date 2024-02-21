@@ -2,9 +2,9 @@
 <launch>
 <node
     respawn="true"
-    name="test"
-    pkg="test"
-    type="test.py"
+    name="qtm_interface"
+    pkg="qtm_interface"
+    type="qtm_interface.py"
     output="screen"
 />
 </launch>
