@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+# roslaunch qtm_interface qtm_interface.launch
+
 """
     Streaming 6Dof from QTM
 """
@@ -15,8 +17,8 @@ import numpy as np
 
 import qtm
 
-QTM_IP = "10.21.117.108"
-BODY_NAME = "BriceRigidBody"
+QTM_IP = "192.168.1.4"          # IP du pc qtm
+BODY_NAME = "BriceRigidBody"    # nom du rigid body
 connection = None
 
 def create_body_index(xml_string):
