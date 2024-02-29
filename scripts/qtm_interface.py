@@ -7,7 +7,7 @@
 """
 
 import rospy
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Pose
 
 import asyncio
 import xml.etree.ElementTree as ET
@@ -20,6 +20,7 @@ import qtm
 QTM_IP = "192.168.1.4"          # IP du pc qtm
 BODY_NAME = "BriceRigidBody"    # nom du rigid body
 connection = None
+robot_position = Pose()
 
 def create_body_index(xml_string):
     """ Extract a name to index dictionary from 6dof settings xml """
@@ -67,17 +68,23 @@ async def main():
     def on_packet(packet):
         _, bodies = packet.get_6d()
         wanted_index = body_index[BODY_NAME] 
-        pos, rot = bodies[wanted_index]           
-        pose = Twist()
-        pose.linear.x = pos.x      
-        pose.linear.y = pos.y
-        pose.linear.z = pos.z
+        pos, rot = bodies[wanted_index] 
+
+        pose = Pose
+        global robot_position
+        # Linear position          
+        pose.position.x = pos.x      
+        pose.position.y = pos.y
+        pose.position.z = pos.z
+
+        # Angular position
         r = R.from_matrix(np.array(rot).reshape((3, 3))).as_euler('xyz')
-        # print(pose)
-        pose.angular.x = r[0]
-        pose.angular.y = r[1]
-        pose.angular.z = r[2]
-        pub_pose.publish(pose)
+        pose.orientation.x = r[0]
+        pose.orientation.y = r[1]
+        pose.orientation.z = r[2]
+        
+        robot_position = pose
+        #pub_pose.publish(pose)
 
     # Start streaming frames
     await connection.stream_frames(components=["6d"], on_packet=on_packet)
@@ -92,7 +99,8 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     qtm_node = rospy.init_node("qtm")
-    pub_pose = rospy.Publisher(f"qtm/{BODY_NAME}/6dof_pose", Twist , queue_size=10)
+    #pub_pose = rospy.Publisher(f"qtm/{BODY_NAME}/6dof_pose", Twist , queue_size=10)
+    
     # Run our asynchronous function until complete
     asyncio.ensure_future(main())
     asyncio.get_event_loop().run_forever()
