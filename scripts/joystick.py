@@ -13,7 +13,7 @@ class JoystickControl:
 
         rospy.init_node('joystick_control')
         rospy.Subscriber("joy", Joy, self.joy_callback)
-        self.cmd_vel_pub = rospy.Publisher('turtle1/cmd_vel', Twist, queue_size=10)
+        self.cmd_vel_pub = rospy.Publisher('mobile_base/commands/velocity', Twist, queue_size=10)
         self.rate = rospy.Rate(100)  # 100 Hz
 
     def joy_callback(self, data):

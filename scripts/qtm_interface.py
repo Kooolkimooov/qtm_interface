@@ -42,7 +42,7 @@ def body_enabled_count(xml_string):
 
 async def shutdown(connection: qtm.QRTConnection):
     rospy.loginfo("waiting for end of capture...")
-    event = await connection.await_event(qtm.QRTEvent.EventCaptureStopped)
+    event = await connection.await_event(qtm.QRTEvent.EventCaptureStopped, timeout=600)
     if event == qtm.QRTEvent.EventCaptureStopped:
         rospy.loginfo("shutting down...")
         async with qtm.TakeControl(connection, PASSWORD):
@@ -68,7 +68,7 @@ async def main():
     async with qtm.TakeControl(connection, PASSWORD):
 
         if REAL_TIME:
-            rospy.logwarn(f"please starting recording on qtm machine ({QTM_IP})...")
+            rospy.logwarn(f"please start recording on qtm machine ({QTM_IP})...")
             await connection.new()
             await connection.await_event(qtm.QRTEvent.EventCaptureStarted)
             rospy.loginfo("recording started.")
