@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 <node
-    respawn="true"
+    respawn="false"
     name="qtm_interface"
     pkg="qtm_interface"
     type="qtm_interface.py"
