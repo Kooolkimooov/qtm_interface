@@ -22,11 +22,13 @@ class Controller:
 
     def __init__(self) -> None:
 
-        self.waypoints = np.array([[0.6, 0.6]])
+        self.acquisition_flag=False
+
+        self.waypoints = np.array([[0.6, 0.6], [0.01, 0.01], [-0.67, -0.72], [-0.32, 0.23], [0.01, 0.01]])
 
 
         self.theta_tb = 0
-        self.tb_center = np.array([0, 0])
+        self.tb_center = np.array([0.7, 0.7])
 
         self.waypoints_incr = 0
         self.waypoint = self.waypoints[self.waypoints_incr]
@@ -38,10 +40,10 @@ class Controller:
         self.Xout = self.X0.reshape(1, -1)
         self.Trajectory = self.Xout
 
-        self.MaxAngularSpeed = np.deg2rad(180)
-        self.MaxAngularAccel = np.deg2rad(50)
-        self.MaxLinearSpeed = 0.5
-        self.MaxLinearAccel = 0.2
+        self.MaxAngularSpeed = np.deg2rad(70)
+        self.MaxAngularAccel = np.deg2rad(360)
+        self.MaxLinearSpeed = 1.5
+        self.MaxLinearAccel = 1
 
         self.linearSpeed = 0
         self.angularSpeed = 0
@@ -62,7 +64,7 @@ class Controller:
         rospy.init_node('PID_controller')
         rospy.Subscriber(topic_name, Pose, self.acquistion)
         self.cmd_vel_pub = rospy.Publisher('mobile_base/commands/velocity', Twist, queue_size=10)
-        self.rate = rospy.Rate(100)  # 100 Hz
+        self.rate = rospy.Rate(500)  # 500 Hz
 
         rospy.loginfo("Initialisation of the node PID_controller")
 
@@ -74,7 +76,7 @@ class Controller:
             self.tb_center[0] = pose.position.x/1000
             self.tb_center[1] = pose.position.y/1000
             self.theta_tb = pose.orientation.z*np.pi/180
-        
+            self.acquisition_flag=True
 
     #================================== Fonctions ============================================
     # Fonctions de calculs
@@ -128,11 +130,11 @@ class Controller:
 
     # Algorithmes de génération de commandes (angulaire et linéaire)
 
-    def rotate_tb(self,TB_center, waypoint, theta_tb, MaxAngularSpeed, MaxAngularAccel, angularSpeed, epsilon):
+    def rotate_tb(self,tb_center, waypoint, theta_tb, MaxAngularSpeed, MaxAngularAccel, angularSpeed, epsilon):
         # Génère la consigne trapézoïdale en vitesse angulaire
-        rospy.logdebug(f"rotating {theta_tb} {TB_center} {waypoint}")
-        theta_remain = self.ModuloByAngle(TB_center, waypoint, theta_tb)
-        theta_stop = (angularSpeed**2) / (2 * MaxAngularAccel)  # Voir démonstration
+        rospy.logdebug(f"rotating {theta_tb} {tb_center} {waypoint}")
+        theta_remain = self.ModuloByAngle(tb_center, waypoint, theta_tb)
+        theta_stop = ((angularSpeed**2) / (2 * MaxAngularAccel))*6  # Voir démonstration
 
         bool_val = False
 
@@ -165,22 +167,22 @@ class Controller:
         return angularAccel, bool_val
 
 
-    def linear_tb(self,waypoint, TB_center, theta_tb, MaxLinearSpeed, MaxLinearAccel, linearSpeed, epsilon):
+    def linear_tb(self,waypoint, tb_center, theta_tb, MaxLinearSpeed, MaxLinearAccel, linearSpeed, epsilon):
 
-        rospy.logdebug(f"Translating {theta_tb} {TB_center} {waypoint}")
+        rospy.logdebug(f"Translating {theta_tb} {tb_center} {waypoint}")
         # Génère la consigne trapézoïdale en vitesse linéaire (algo très proche de la consigne en vitesse angulaire)
 
-        projected_dist, projected_point = self.DistancePointToSegment(TB_center, theta_tb, waypoint)
+        projected_dist, projected_point = self.DistancePointToSegment(tb_center, theta_tb, waypoint)
 
-        dist_remain = np.linalg.norm(projected_point - TB_center)  # Distance entre le centre du robot et le projeté du waypoint
+        dist_remain = np.linalg.norm(projected_point - tb_center)  # Distance entre le centre du robot et le projeté du waypoint
 
         # On regarde si le waypoint est devant ou derrière le robot avec angle_error
         vecteur_tb = np.array([np.cos(theta_tb), np.sin(theta_tb)])
-        vecteur_TBW = np.array([waypoint[0] - TB_center[0], waypoint[1] - TB_center[1]])
+        vecteur_TBW = np.array([waypoint[0] - tb_center[0], waypoint[1] - tb_center[1]])
 
         angle_error = np.arccos(np.dot(vecteur_tb, vecteur_TBW) / (np.linalg.norm(vecteur_tb) * np.linalg.norm(vecteur_TBW)))
 
-        dist_stop = (linearSpeed**2 / (2 * MaxLinearAccel))*2  # Voir démonstration
+        dist_stop = (linearSpeed**2 / (2 * MaxLinearAccel))*6  # Voir démonstration
         linearSpeed = 0
         bool_val = False
 
@@ -221,67 +223,64 @@ def main():
     twist = Twist()
 
     while not rospy.is_shutdown():
-        # Machine à états
-        if controller.TB_state == "rotating":
-            controller.angularAccel, bool_val = controller.rotate_tb(controller.tb_center, controller.waypoint, controller.theta_tb, controller.MaxAngularSpeed, controller.MaxAngularAccel, controller.angularSpeed, controller.epsilon_angle)
-            controller.angularAccel = controller.angularAccel
-            controller.angularSpeed += controller.angularAccel * controller.delta_t
-            controller.linearSpeed = 0
-            if bool_val:
-                controller.TB_state = "moving"
+        if(controller.acquisition_flag):
+            # Machine à états
+            if controller.TB_state == "rotating":
+                controller.angularAccel, bool_val = controller.rotate_tb(controller.tb_center, controller.waypoint, controller.theta_tb, controller.MaxAngularSpeed, controller.MaxAngularAccel, controller.angularSpeed, controller.epsilon_angle)
+                controller.angularSpeed += controller.angularAccel * controller.delta_t
+                controller.linearSpeed = 0
+                if bool_val:
+                    controller.TB_state = "moving"
 
-            rospy.loginfo(f"TB_state : {controller.TB_state}\n")
-            rospy.loginfo(f" Centre du robot : {controller.tb_center}\n Waypoint : {controller.waypoint} \n\n\n")
-            rospy.loginfo(f"Angle restant : {controller.ModuloByAngle(controller.tb_center, controller.waypoint, controller.theta_tb)*180/np.pi}\n Angle stop : {((controller.angularSpeed**2) / (2 * controller.MaxAngularAccel))*180/np.pi} \n\n\n")
-            rospy.loginfo(f"Vitesse angulaire : {controller.angularSpeed}\n Accel angulaire : {controller.angularAccel} \n\n\n")
-            rospy.loginfo(f"Epsilon angle : {controller.epsilon_angle*180/np.pi}\n\n\n\n\n")
+                rospy.loginfo(f"TB_state : {controller.TB_state}\n")
+                rospy.loginfo(f" Centre du robot : {controller.tb_center}\n Waypoint : {controller.waypoint} \n\n\n")
+                rospy.loginfo(f"Angle restant : {controller.ModuloByAngle(controller.tb_center, controller.waypoint, controller.theta_tb)*180/np.pi}\n Angle stop : {((controller.angularSpeed**2) / (2 * controller.MaxAngularAccel))*180/np.pi} \n\n\n")
+                rospy.loginfo(f"Vitesse angulaire : {controller.angularSpeed}\n Accel angulaire : {controller.angularAccel} \n\n\n")
+                rospy.loginfo(f"Epsilon angle : {controller.epsilon_angle*180/np.pi}\n\n\n\n\n")
 
-        elif controller.TB_state == "moving":
-            controller.linearAccel, bool_val = controller.linear_tb(controller.waypoint, controller.tb_center, controller.theta_tb, controller.MaxLinearSpeed, controller.MaxLinearAccel, controller.linearSpeed, controller.epsilon_dist)
-            controller.linearAccel = controller.linearAccel
-            controller.angularSpeed = 0
-            controller.linearSpeed += controller.linearAccel * controller.delta_t
+            elif controller.TB_state == "moving":
+                controller.linearAccel, bool_val = controller.linear_tb(controller.waypoint, controller.tb_center, controller.theta_tb, controller.MaxLinearSpeed, controller.MaxLinearAccel, controller.linearSpeed, controller.epsilon_dist)
+                controller.linearAccel = controller.linearAccel
+                controller.angularSpeed = 0
+                controller.linearSpeed += controller.linearAccel * controller.delta_t
 
-            projected_dist, projected_point = controller.DistancePointToSegment(controller.tb_center, controller.theta_tb, controller.waypoint)
+                projected_dist, projected_point = controller.DistancePointToSegment(controller.tb_center, controller.theta_tb, controller.waypoint)
 
-            rospy.loginfo(f"TB_state : {controller.TB_state}\n")
-            rospy.loginfo(f"Projeté du point : {projected_dist}\n Waypoint : {controller.waypoint} \n\n\n")
-            rospy.loginfo(f"Centre du robot : {controller.tb_center}") 
-            rospy.loginfo(f"Distance restante : {np.linalg.norm(projected_point - controller.TB_center)}\n Distance stop : {(controller.linearSpeed**2 / (2 * controller.MaxLinearAccel))*2} \n\n\n")
-            rospy.loginfo(f"Vitesse linéaire : {controller.linearSpeed}\n Accel linéaire : {controller.linearAccel} \n\n\n")
-            rospy.loginfo(f"Epsilon dist : {controller.epsilon_dist}\n\n\n\n\n")
+                rospy.loginfo(f"TB_state : {controller.TB_state}\n")
+                rospy.loginfo(f"Projeté du point : {projected_dist}\n Waypoint : {controller.waypoint} \n\n\n")
+                rospy.loginfo(f"Centre du robot : {controller.tb_center}") 
+                rospy.loginfo(f"Distance restante : {np.linalg.norm(projected_point - controller.tb_center)}\n Distance stop : {(controller.linearSpeed**2 / (2 * controller.MaxLinearAccel))*2} \n\n\n")
+                rospy.loginfo(f"Vitesse linéaire : {controller.linearSpeed}\n Accel linéaire : {controller.linearAccel} \n\n\n")
+                rospy.loginfo(f"Epsilon dist : {controller.epsilon_dist}\n\n\n\n\n")
 
-            if bool_val:
-                controller.TB_state = "idle"
-        elif controller.TB_state == "idle":
-            controller.angularAccel = 0
-            controller.linearAccel = 0
-            controller.angularSpeed = 0
-            controller.linearSpeed = 0
-            if controller.waypoints_incr >= len(controller.waypoints):
-                controller.TB_state = "rotating"
-            else:
-                if controller.idle_delay <= 20:
+                if bool_val:
                     controller.TB_state = "idle"
-                    controller.idle_delay += 1
-                else:
-                    controller.waypoints_incr += 1
+            elif controller.TB_state == "idle":
+                controller.waypoints_incr += 1
+                controller.angularAccel = 0
+                controller.linearAccel = 0
+                controller.angularSpeed = 0
+                controller.linearSpeed = 0
+                if controller.waypoints_incr < len(controller.waypoints):
                     controller.waypoint = controller.waypoints[controller.waypoints_incr]
                     controller.TB_state = "rotating"
+                else:
+                        controller.TB_state = "idle"
 
-        twist.linear.x = controller.linearSpeed
-        twist.angular.z = controller.angularSpeed
 
-        if not controller.emergency:
-            controller.cmd_vel_pub.publish(twist)
-        # t_eval = [0, controller.delta_t]
-        # Xout = odeint(controller.dynamic_model, Xout[-1], t_eval, args=(u,), tfirst=True)
-        # X0 = Xout[-1]
-        # theta_tb = X0[2]
-        # tb_center = X0[:2]
-        # Trajectory = np.append(Trajectory, Xout[1:], axis=0)
+            twist.linear.x = controller.linearSpeed
+            twist.angular.z = controller.angularSpeed
 
-        controller.rate.sleep()
+            if not controller.emergency:
+                controller.cmd_vel_pub.publish(twist)
+            # t_eval = [0, controller.delta_t]
+            # Xout = odeint(controller.dynamic_model, Xout[-1], t_eval, args=(u,), tfirst=True)
+            # X0 = Xout[-1]
+            # theta_tb = X0[2]
+            # tb_center = X0[:2]
+            # Trajectory = np.append(Trajectory, Xout[1:], axis=0)
+
+            controller.rate.sleep()
 
 
 
