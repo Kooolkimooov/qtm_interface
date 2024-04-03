@@ -23,8 +23,9 @@ class Controller:
     def __init__(self) -> None:
 
         self.acquisition_flag=False
+        self.back_track = False
 
-        self.waypoints = np.array([[0.6, 0.6], [0.01, 0.01], [-0.67, -0.72], [-0.32, 0.23], [0.01, 0.01]])
+        self.waypoints = np.array([[1.7, 0.01], [0.01, 0.01], [-0.67, -0.72], [-0.32, 0.23], [0.01, 0.01]])
 
 
         self.theta_tb = 0
@@ -57,9 +58,9 @@ class Controller:
         self.TB_state = "rotating"
         self.idle_delay = 0
 
-        self.delta_t = 1/100
-
         self.emergency = False
+
+        self.delta_t = 1/100
 
         rospy.init_node('PID_controller')
         rospy.Subscriber(topic_name, Pose, self.acquistion)
@@ -71,12 +72,31 @@ class Controller:
     def acquistion(self,pose):
         if (isnan((pose.position.x) or isnan(pose.position.y) or isnan(pose.orientation.z))):
             self.emergency = True
+            self.tracking_lost()
             
         else:
             self.tb_center[0] = pose.position.x/1000
             self.tb_center[1] = pose.position.y/1000
-            self.theta_tb = pose.orientation.z*np.pi/180
+            self.theta_tb = pose.orientation.z * np.pi/180
             self.acquisition_flag=True
+            if self.emergency:
+                self.tracking_back()
+                self.emergency = False
+    
+    def tracking_back(self):
+        self.waypoints[self.waypoints_incr, :] = np.array([.01, .01])
+        self.TB_state = "rotating"
+
+    def tracking_lost(self):
+        twist =  Twist()
+        twist.linear.x = -0.3
+        for t in range(4000):
+            self.cmd_vel_pub.publish(twist)
+        self.back_track = True
+
+        
+        
+
 
     #================================== Fonctions ============================================
     # Fonctions de calculs
@@ -132,7 +152,7 @@ class Controller:
 
     def rotate_tb(self,tb_center, waypoint, theta_tb, MaxAngularSpeed, MaxAngularAccel, angularSpeed, epsilon):
         # Génère la consigne trapézoïdale en vitesse angulaire
-        rospy.logdebug(f"rotating {theta_tb} {tb_center} {waypoint}")
+        rospy.loginfo(f"rotating {theta_tb} {tb_center} {waypoint}")
         theta_remain = self.ModuloByAngle(tb_center, waypoint, theta_tb)
         theta_stop = ((angularSpeed**2) / (2 * MaxAngularAccel))*6  # Voir démonstration
 
@@ -169,7 +189,7 @@ class Controller:
 
     def linear_tb(self,waypoint, tb_center, theta_tb, MaxLinearSpeed, MaxLinearAccel, linearSpeed, epsilon):
 
-        rospy.logdebug(f"Translating {theta_tb} {tb_center} {waypoint}")
+        rospy.loginfo(f"Translating {theta_tb} {tb_center} {waypoint}")
         # Génère la consigne trapézoïdale en vitesse linéaire (algo très proche de la consigne en vitesse angulaire)
 
         projected_dist, projected_point = self.DistancePointToSegment(tb_center, theta_tb, waypoint)
