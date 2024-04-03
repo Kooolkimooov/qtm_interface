@@ -71,12 +71,22 @@ class Controller:
     def acquistion(self,pose):
         if (isnan((pose.position.x) or isnan(pose.position.y) or isnan(pose.orientation.z))):
             self.emergency = True
-            
+            self.traking_lost(self.emergency)  
         else:
             self.tb_center[0] = pose.position.x/1000
             self.tb_center[1] = pose.position.y/1000
             self.theta_tb = pose.orientation.z*np.pi/180
             self.acquisition_flag=True
+            self.emergency = False
+    
+    def traking_lost(self, emergency):
+        twist = Twist()
+        while(emergency):
+            twist.linear.x = -self.linearSpeed
+            self.cmd_vel_pub.publish(twist)
+        self.waypoints = np.array([[0.001, 0.001]])
+        self.rate.sleep()
+
 
     #================================== Fonctions ============================================
     # Fonctions de calculs
@@ -273,12 +283,6 @@ def main():
 
             if not controller.emergency:
                 controller.cmd_vel_pub.publish(twist)
-            # t_eval = [0, controller.delta_t]
-            # Xout = odeint(controller.dynamic_model, Xout[-1], t_eval, args=(u,), tfirst=True)
-            # X0 = Xout[-1]
-            # theta_tb = X0[2]
-            # tb_center = X0[:2]
-            # Trajectory = np.append(Trajectory, Xout[1:], axis=0)
 
             controller.rate.sleep()
 
