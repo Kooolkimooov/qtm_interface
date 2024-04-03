@@ -24,7 +24,7 @@ class Controller:
 
         self.acquisition_flag=False
 
-        self.waypoints = np.array([[0.6, 0.6], [0.01, 0.01], [-0.67, -0.72], [-0.32, 0.23], [0.01, 0.01]])
+        self.waypoints = np.array([[1.2, 1.2], [0.01, 0.01], [-0.67, -0.72], [-0.32, 0.23], [0.01, 0.01]])
 
 
         self.theta_tb = 0
@@ -85,7 +85,7 @@ class Controller:
             twist.linear.x = -self.linearSpeed
             self.cmd_vel_pub.publish(twist)
         self.waypoints = np.array([[0.001, 0.001]])
-        self.rate.sleep()
+        #self.rate.sleep()
 
 
     #================================== Fonctions ============================================
