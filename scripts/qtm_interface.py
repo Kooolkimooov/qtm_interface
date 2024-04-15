@@ -42,7 +42,7 @@ def body_enabled_count(xml_string):
 
 async def shutdown(connection: qtm.QRTConnection):
     rospy.loginfo("waiting for end of capture...")
-    event = await connection.await_event(qtm.QRTEvent.EventCaptureStopped, timeout=600)
+    event = await connection.await_event(qtm.QRTEvent.EventCaptureStopped, timeout=3600)
     if event == qtm.QRTEvent.EventCaptureStopped:
         rospy.loginfo("shutting down...")
         async with qtm.TakeControl(connection, PASSWORD):
@@ -83,7 +83,6 @@ async def main():
     wanted_index = body_index[BODY_NAME] 
 
     def on_packet(packet: qtm.QRTPacket):  
-
         _, bodies = packet.get_6d_euler()
         pos, rot = bodies[wanted_index] 
 
@@ -98,7 +97,7 @@ async def main():
         robot_pose.orientation.x = rot.a1
         robot_pose.orientation.y = rot.a2
         robot_pose.orientation.z = rot.a3
-        
+
         pose_publisher.publish(robot_pose)
 
     
@@ -109,7 +108,7 @@ async def main():
 
 if __name__ == "__main__":
     qtm_node = rospy.init_node("qtm")
-    pose_publisher = rospy.Publisher(f"qtm/{BODY_NAME}/6dof_pose", Pose, queue_size=10)
+    pose_publisher = rospy.Publisher(f"qtm/{BODY_NAME}/6dof_pose", Pose, queue_size=2)
     
     asyncio.ensure_future(main())
     asyncio.get_event_loop().run_forever()
