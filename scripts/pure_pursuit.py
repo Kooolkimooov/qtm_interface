@@ -49,9 +49,9 @@ def interpolation(waypoint_list, interpolation_number):
 ########################################################################################################
 
 # Parameters
-k = 0.001  # look forward gain
+k = 0.0015  # look forward gain
 Lfc = 0.2  # [m] look-ahead distance
-Kp = 0.075  # speed proportional gain
+Kp = 0.01  # speed proportional gain
 dt = 0.01  # [s] time tick
 
 
@@ -108,7 +108,7 @@ class TargetCourse:
     def __init__(self, cx, cy):
         self.cx = cx
         self.cy = cy
-        self.old_nearest_point_index = None
+        self.old_nearest_point_index = 0
 
     def search_target_index(self, state):
 
@@ -171,10 +171,10 @@ def pure_pursuit_steer_control(state, trajectory, t_ind):
 
 def main():
     # Trajectory
-    # waitpoints = np.array([[-1, 0], [-0.9, -0.9], [0.8, -0.8], [0.9, 0.6], [0, 0.7], [0, 0]])
+    # waitpoints = np.array([[-1, 0], [0.9, 0.9], [0.8, -0.8], [0.9, 0.6], [0, 0.7], [0, 0]])
 
-    waitpoints = np.array([[1, 1],[-1, 1], [1, -1], [-0.4, -0.4], [1, -1]])
-    cx, cy = interpolation(waitpoints, 1000)
+    waitpoints = np.array([[0, 0],[-0.91, 1.2], [0.36, 1.12], [-1.13, 0.38], [-0.45, -0.80], [0.7, -0.9], [0, 0]])
+    cx, cy = interpolation(waitpoints, 10000)
 
     target_course = TargetCourse(cx, cy)
     
