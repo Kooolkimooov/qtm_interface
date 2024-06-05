@@ -1,14 +1,16 @@
 <?xml version="1.0"?>
 <launch>
-<node
-    respawn="false"
-    name="qtm_interface"
-    pkg="qtm_interface"
-    type="qtm_interface.py"
-    output="screen"
-/>
 
-<!-- <node
-    name="PID_controller" pkg="qtm_interface" type="PID_controller.py"
-/> -->
+    <group ns="qtm">
+
+        <node
+            respawn="false"
+            name="qtm_interface"
+            pkg="qtm_interface"
+            type="qtm_interface.py"
+            output="screen"
+        />
+
+    </group>
+
 </launch>

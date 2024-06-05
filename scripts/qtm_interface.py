@@ -8,22 +8,19 @@
 
 import rospy
 from geometry_msgs.msg import Pose
-
 import asyncio
 import xml.etree.ElementTree as ET
-import signal
+from numpy import array
 from scipy.spatial.transform import Rotation as R
-import numpy as np
-
 import qtm
 
-QTM_IP = "192.168.1.3"                  # IP du pc qtm
+QTM_IP = "172.23.48.1"                  # IP du pc qtm
 PORT = 22223                            # port that qtm listens to
-VERSION = "1.21"                        # version of the rt protocol
-COMPONENTS = ["3dnolabels", "6deuler"]  # type of data to stream
-BODY_NAME = "turtle"                    # nom du rigid body
+VERSION = "1.23"                        # version of the rt protocol
+COMPONENTS = ["3dnolabels", "6d"]       # type of data to stream
+BODY_NAME = "BriceRigidBody"            # nom du rigid body
 PASSWORD = "password"                   # qtm password for remote control
-REAL_TIME = True                        # if the script should start playback (false) or recording (true)
+REAL_TIME = False                       # if the script should start playback (false) or recording (true)
 
 def create_body_index(xml_string):
     """ Extract a name to index dictionary from 6dof settings xml """
@@ -42,8 +39,12 @@ def body_enabled_count(xml_string):
 
 async def shutdown(connection: qtm.QRTConnection):
     rospy.loginfo("waiting for end of capture...")
-    event = await connection.await_event(qtm.QRTEvent.EventCaptureStopped, timeout=3600)
-    if event == qtm.QRTEvent.EventCaptureStopped:
+    if REAL_TIME:
+        event = await connection.await_event(qtm.QRTEvent.EventCaptureStopped, timeout=3600)
+    else:
+        event = await connection.await_event(qtm.QRTEvent.EventRTfromFileStopped, timeout=3600)
+        
+    if event:
         rospy.loginfo("shutting down...")
         async with qtm.TakeControl(connection, PASSWORD):
             await connection.stream_frames_stop()
@@ -55,12 +56,12 @@ async def main():
     global REAL_TIME
     rospy.loginfo("trying to connect...")
     # Connect to qtm
-    connection = await qtm.connect(QTM_IP, PORT, VERSION, timeout=1) 
+    connection = await qtm.connect(QTM_IP, PORT, VERSION) 
 
     # Connection failed?
     if connection is None:
         rospy.logerr("failed to connect.")
-        return
+        quit()
     else:
         rospy.loginfo("connection successful.")
 
@@ -83,20 +84,23 @@ async def main():
     wanted_index = body_index[BODY_NAME] 
 
     def on_packet(packet: qtm.QRTPacket):  
-        _, bodies = packet.get_6d_euler()
+        _, bodies = packet.get_6d()
         pos, rot = bodies[wanted_index] 
 
         robot_pose = Pose()
 
         # Linear position          
-        robot_pose.position.x = pos.x      
+        robot_pose.position.x = pos.x 
         robot_pose.position.y = pos.y
         robot_pose.position.z = pos.z
 
+        quat = R.from_matrix(array(rot.matrix).reshape((3,3))).as_quat()
+
         # Angular position
-        robot_pose.orientation.x = rot.a1
-        robot_pose.orientation.y = rot.a2
-        robot_pose.orientation.z = rot.a3
+        robot_pose.orientation.x = quat[0]
+        robot_pose.orientation.y = quat[1]
+        robot_pose.orientation.z = quat[2]
+        robot_pose.orientation.w = quat[3]
 
         pose_publisher.publish(robot_pose)
 
@@ -108,7 +112,7 @@ async def main():
 
 if __name__ == "__main__":
     qtm_node = rospy.init_node("qtm")
-    pose_publisher = rospy.Publisher(f"qtm/{BODY_NAME}/6dof_pose", Pose, queue_size=2)
+    pose_publisher = rospy.Publisher(f"{BODY_NAME}/6dof_pose", Pose, queue_size=2)
     
     asyncio.ensure_future(main())
     asyncio.get_event_loop().run_forever()
