@@ -14,13 +14,13 @@ from numpy import array
 from scipy.spatial.transform import Rotation as R
 import qtm
 
-QTM_IP = "172.23.48.1"                  # IP du pc qtm
+QTM_IP = "192.168.1.5"                  # IP du pc qtm
 PORT = 22223                            # port that qtm listens to
-VERSION = "1.23"                        # version of the rt protocol
+VERSION = "1.21"                        # version of the rt protocol
 COMPONENTS = ["3dnolabels", "6d"]       # type of data to stream
-BODY_NAME = "BriceRigidBody"            # nom du rigid body
+BODY_NAME = "Basile"                    # nom du rigid body
 PASSWORD = "password"                   # qtm password for remote control
-REAL_TIME = False                       # if the script should start playback (false) or recording (true)
+REAL_TIME = True                        # if the script should start playback (false) or recording (true)
 
 def create_body_index(xml_string):
     """ Extract a name to index dictionary from 6dof settings xml """
@@ -54,7 +54,7 @@ async def shutdown(connection: qtm.QRTConnection):
 
 async def main():
     global REAL_TIME
-    rospy.loginfo("trying to connect...")
+    rospy.loginfo("trying to connect to " + QTM_IP + ":" + str(PORT) + " v" + VERSION)
     # Connect to qtm
     connection = await qtm.connect(QTM_IP, PORT, VERSION) 
 
