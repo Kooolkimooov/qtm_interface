@@ -7,14 +7,14 @@
 """
 
 import rospy
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import PoseStamped
 import asyncio
 import xml.etree.ElementTree as ET
 from numpy import array
 from scipy.spatial.transform import Rotation as R
 import qtm
 
-QTM_IP = "192.168.1.5"                  # IP du pc qtm
+QTM_IP = "192.168.1.8"                  # IP du pc qtm
 PORT = 22223                            # port that qtm listens to
 VERSION = "1.21"                        # version of the rt protocol
 COMPONENTS = ["3dnolabels", "6d"]       # type of data to stream
@@ -84,23 +84,27 @@ async def main():
     wanted_index = body_index[BODY_NAME] 
 
     def on_packet(packet: qtm.QRTPacket):  
+
         _, bodies = packet.get_6d()
         pos, rot = bodies[wanted_index] 
 
-        robot_pose = Pose()
+        robot_pose = PoseStamped()
 
         # Linear position          
-        robot_pose.position.x = pos.x 
-        robot_pose.position.y = pos.y
-        robot_pose.position.z = pos.z
+        robot_pose.pose.position.x = pos.x / 1000.
+        robot_pose.pose.position.y = pos.y / 1000.
+        robot_pose.pose.position.z = pos.z / 1000.
 
         quat = R.from_matrix(array(rot.matrix).reshape((3,3))).as_quat()
 
         # Angular position
-        robot_pose.orientation.x = quat[0]
-        robot_pose.orientation.y = quat[1]
-        robot_pose.orientation.z = quat[2]
-        robot_pose.orientation.w = quat[3]
+        robot_pose.pose.orientation.x = quat[0]
+        robot_pose.pose.orientation.y = quat[1]
+        robot_pose.pose.orientation.z = quat[2]
+        robot_pose.pose.orientation.w = quat[3]
+
+        robot_pose.header.seq = packet.framenumber
+        robot_pose.header.frame_id = "map"
 
         pose_publisher.publish(robot_pose)
 
@@ -112,7 +116,7 @@ async def main():
 
 if __name__ == "__main__":
     qtm_node = rospy.init_node("qtm")
-    pose_publisher = rospy.Publisher(f"{BODY_NAME}/6dof_pose", Pose, queue_size=2)
+    pose_publisher = rospy.Publisher(f"{BODY_NAME}/6dof_pose", PoseStamped, queue_size=2)
     
     asyncio.ensure_future(main())
     asyncio.get_event_loop().run_forever()
