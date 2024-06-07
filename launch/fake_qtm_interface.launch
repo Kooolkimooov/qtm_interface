@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+
+    <group ns="qtm">
+
+        <node
+            respawn="false"
+            name="fake_qtm_interface"
+            pkg="qtm_interface"
+            type="fake_qtm_interface.py"
+            output="screen"
+        />
+
+    </group>
+
+</launch>
