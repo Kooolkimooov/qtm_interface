@@ -14,11 +14,11 @@ from numpy import array
 from scipy.spatial.transform import Rotation as R
 import qtm
 
-QTM_IP = "192.168.1.8"                  # IP du pc qtm
+QTM_IP = "10.0.1.69"                    # IP du pc qtm
 PORT = 22223                            # port that qtm listens to
 VERSION = "1.21"                        # version of the rt protocol
 COMPONENTS = ["3dnolabels", "6d"]       # type of data to stream
-BODY_NAME = "Basile"                    # nom du rigid body
+BODY_NAME = "turtle_bot_0"              # nom du rigid body
 PASSWORD = "password"                   # qtm password for remote control
 REAL_TIME = True                        # if the script should start playback (false) or recording (true)
 
@@ -71,7 +71,7 @@ async def main():
         if REAL_TIME:
             rospy.logwarn(f"please start recording on qtm machine ({QTM_IP})...")
             await connection.new()
-            await connection.await_event(qtm.QRTEvent.EventCaptureStarted)
+            # await connection.await_event(qtm.QRTEvent.EventCaptureStarted)
             rospy.loginfo("recording started.")
         else:
             rospy.loginfo("starting playback...")
