@@ -71,7 +71,7 @@ async def main():
         if REAL_TIME:
             rospy.logwarn(f"please start recording on qtm machine ({QTM_IP})...")
             await connection.new()
-            # await connection.await_event(qtm.QRTEvent.EventCaptureStarted)
+            await connection.await_event(qtm.QRTEvent.EventCaptureStarted)
             rospy.loginfo("recording started.")
         else:
             rospy.loginfo("starting playback...")
