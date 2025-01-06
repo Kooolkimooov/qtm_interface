@@ -1,7 +1,5 @@
 #!/usr/bin/python3
 
-# roslaunch qtm_interface qtm_interface.launch
-
 """
     Streaming 6Dof from QTM
 """
@@ -13,6 +11,7 @@ import xml.etree.ElementTree as ET
 from numpy import array
 from scipy.spatial.transform import Rotation as R
 import qtm
+import sys
 
 QTM_IP = "10.0.1.69"                    # IP du pc qtm
 PORT = 22223                            # port that qtm listens to
@@ -115,6 +114,7 @@ async def main():
     asyncio.ensure_future(shutdown(connection))
 
 if __name__ == "__main__":
+
     qtm_node = rospy.init_node("qtm")
     pose_publisher = rospy.Publisher(f"{BODY_NAME}/6dof_pose", PoseStamped, queue_size=2)
     
