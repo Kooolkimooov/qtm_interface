@@ -1,23 +1,23 @@
 <?xml version="1.0"?>
 <launch>
 
-  <arg 
-  name="interface_args"
-  doc="use '-h' or '--help' for more information"
-  />
-
-  <group ns="qtm">
-
-    <node
-      name="fake_qtm_interface"
-      pkg="qtm_interface"
-      type="fake_qtm_interface.py"
-      respawn="false"
-      required="true"
-      args="$(arg interface_args)"
-      output="screen"
+    <arg
+            name="interface_args"
+            doc="use '-h' or '--help' for more information"
     />
 
-  </group>
+    <group ns="qtm">
+
+        <node
+                name="fake_qtm_interface"
+                pkg="qtm_interface"
+                type="fake_qtm_interface.py"
+                respawn="false"
+                required="true"
+                args="$(arg interface_args)"
+                output="screen"
+        />
+
+    </group>
 
 </launch>

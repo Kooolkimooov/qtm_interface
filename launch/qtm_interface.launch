@@ -4,11 +4,11 @@
     <group ns="qtm">
 
         <node
-            respawn="false"
-            name="qtm_interface"
-            pkg="qtm_interface"
-            type="qtm_interface.py"
-            output="screen"
+                respawn="false"
+                name="qtm_interface"
+                pkg="qtm_interface"
+                type="qtm_interface.py"
+                output="screen"
         />
 
     </group>
