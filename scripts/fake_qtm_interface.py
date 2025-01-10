@@ -96,7 +96,7 @@ def fake_packets( args: Namespace ):
         'interface': interface,
         'state'    : state,
         'actuation': zeros( simulator.actuation_size ),
-        'publisher': rospy.Publisher( f'pose/{name}', PoseStamped, queue_size = 2 ),
+        'publisher': rospy.Publisher( f'pose/{name}', PoseStamped, queue_size = 10 ),
         'listener' : rospy.Subscriber( f'/{command}', interface.command_type, callback ),
         'pose'     : pose
         }
