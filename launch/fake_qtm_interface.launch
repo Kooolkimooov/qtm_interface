@@ -9,13 +9,13 @@
     <group ns="qtm">
 
         <node
-                name="fake_qtm_interface"
                 pkg="qtm_interface"
+                name="fake_qtm_interface"
                 type="fake_qtm_interface.py"
-                respawn="false"
                 required="true"
-                args="$(arg interface_args)"
+                respawn="false"
                 output="screen"
+                args="$(arg interface_args)"
         />
 
     </group>

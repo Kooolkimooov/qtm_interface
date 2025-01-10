@@ -1,0 +1,3 @@
+[submodule "scripts/pympc"]
+	path = scripts/pympc
+	url = git@github.com:Kooolkimooov/pympc.git
