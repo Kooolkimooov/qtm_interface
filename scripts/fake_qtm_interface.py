@@ -78,7 +78,7 @@ def fake_packets( args: Namespace ):
     interface = BaseInterface
 
     if type == 'bluerov':
-      simulator = Bluerov( water_surface_depth = args.water_surface_depth )
+      simulator = Bluerov( water_surface_depth = args.water_surface_depth, reference_frame = 'ENU' )
       interface = BluerovROSInterface
     elif type == 'turtlebot':
       simulator = Turtlebot()
