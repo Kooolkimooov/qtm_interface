@@ -65,7 +65,7 @@ async def stream_robot_pose(connection, body_name, body_index, pose_publisher):
         robot_pose.pose.position.z = pos.z / 1000.0
 
         # Convertit la rotation en quaternion
-        quat = R.from_matrix(array(rot.matrix).reshape((3, 3))).as_quat()
+        quat = R.from_matrix(array(rot.matrix).reshape((3, 3)).T).as_quat()
         robot_pose.pose.orientation.x = quat[0]
         robot_pose.pose.orientation.y = quat[1]
         robot_pose.pose.orientation.z = quat[2]
