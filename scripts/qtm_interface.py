@@ -50,16 +50,17 @@ async def shutdown(connection: qtm.QRTConnection):
     rospy.loginfo("Loop stopped.")
 
 # Fonction pour streamer les donnees de position et d orientation d un robot specifique
-async def stream_robot_pose(connection, body_name, body_index, pose_publisher):
+async def stream_robot_pose(connection, body_name, body_index, pose_publisher: rospy.Publisher):
     """ Streame les donnees de position et d orientation (6DoF) pour un robot donne """
     def on_packet(packet: qtm.QRTPacket):
         # Recupere la position et la rotation pour le robot avec l index donne
         _, bodies = packet.get_6d()
         pos, rot = bodies[body_index]
 
-    quat = R.from_matrix( array( rot.matrix ).reshape( (3, 3) ) ).as_quat()
+        quat = R.from_matrix( array( rot.matrix ).reshape( (3, 3) ).T ).as_quat()
 
         # Convertit la position lineaire en metres
+        robot_pose = PoseStamped()
         robot_pose.pose.position.x = pos.x / 1000.0
         robot_pose.pose.position.y = pos.y / 1000.0
         robot_pose.pose.position.z = pos.z / 1000.0
@@ -77,9 +78,10 @@ async def stream_robot_pose(connection, body_name, body_index, pose_publisher):
 
         # Publie les donnees sur le topic ROS
         pose_publisher.publish(robot_pose)
+        
 
     # Configure QTM pour streamer les donnees en continu
-    rospy.loginfo(f"Starting streaming frames for 6DoF {body_name}...")
+    rospy.loginfo(f"Starting streaming frames for 6DoF {body_name} on topic {pose_publisher.name}")
     await connection.stream_frames(components=COMPONENTS, on_packet=on_packet)
 
 # Fonction principale pour gerer la connexion à QTM et le streaming pour tous les robots
