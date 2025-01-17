@@ -9,13 +9,13 @@ from scipy.spatial.transform import Rotation as R  # Matrices de rotation à qua
 import qtm  # Bibliothèque pour QTM
 
 # Paramètres de connexion
-QTM_IP = "192.168.1.8"
+QTM_IP = "10.0.1.69"
 PORT = 22223
 VERSION = "1.21"
 COMPONENTS = ["6d"]
 PASSWORD = "password"
 REAL_TIME = True
-NUM_ROBOTS = 3
+NUM_ROBOTS = 2
 ROBOT_PREFIX = "turtle_bot_"  # Préfixe des noms des robots
 
 # Fonction pour créer un index associant les noms des robots à leurs indices
