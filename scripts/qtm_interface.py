@@ -1,142 +1,114 @@
 #!/usr/bin/python3
 
-# Importation des bibliotheques necessaires
 import rospy  # ROS pour Python
-from geometry_msgs.msg import PoseStamped  # Message de type PoseStamped pour publier les poses
-import asyncio  # Gestion asynchrone des taches
-import xml.etree.ElementTree as ET  # Parsing des fichiers XML
+from geometry_msgs.msg import PoseStamped  # Message pour publier les poses
+import asyncio  # Gestion des tâches asynchrones
+import xml.etree.ElementTree as ET  # Parsing XML
 from numpy import array  # Manipulation de matrices et vecteurs
-from scipy.spatial.transform import Rotation as R  # Conversion de matrices de rotation en quaternions
-import qtm  # Bibliotheque pour interagir avec Qualisys Track Manager (QTM)
+from scipy.spatial.transform import Rotation as R  # Matrices de rotation à quaternion
+import qtm  # Bibliothèque pour QTM
 
-# Parametres de connexion à QTM
-QTM_IP = "10.0.1.69"  # Adresse IP de QTM
-PORT = 22223  # Port utilise par QTM
-VERSION = "1.21"  # Version du protocole de communication RT
-COMPONENTS = ["6d"]  # Type de donnees a streamer (6 degres de liberte : position + orientation)
-PASSWORD = "password"  # Mot de passe pour controler QTM a distance
-REAL_TIME = True  # Indique si l execution est en temps reel
-NUM_ROBOTS = 1  # Nombre de robots a gerer (modifiable pour adapter le code)
-ROBOT_PREFIX = "turtle_bot_" #Prefixe pour nommer les robots dynamiquement
+# Paramètres de connexion
+QTM_IP = "192.168.1.8"
+PORT = 22223
+VERSION = "1.21"
+COMPONENTS = ["6d"]
+PASSWORD = "password"
+REAL_TIME = True
+NUM_ROBOTS = 3
+ROBOT_PREFIX = "turtle_bot_"  # Préfixe des noms des robots
 
-# Fonction pour extraire l index des rigid bodies a partir d une chaine XML
+# Fonction pour créer un index associant les noms des robots à leurs indices
 def create_body_index(xml_string):
-    """ Génère un dictionnaire associant le nom d'un rigid body à son index """
+    """ Associe chaque nom de rigid body à son index """
     xml = ET.fromstring(xml_string)
-
     body_to_index = {}
-    for index, body in enumerate(xml.findall("*/Body/Name")):  # Parcourt les noms des rigid bodies
+    for index, body in enumerate(xml.findall("*/Body/Name")):
         body_to_index[body.text.strip()] = index
-
     return body_to_index
 
-# Fonction pour arreter le streaming et fermer la connexion à QTM
-async def shutdown(connection: qtm.QRTConnection):
-    """ Arrete le streaming des donnees et ferme proprement la connexion """
-    rospy.loginfo("Waiting for end of capture...")
-    if REAL_TIME:
-        # Attend que l evenement CaptureStopped se produise
-        await connection.await_event(qtm.QRTEvent.EventCaptureStopped, timeout=3600)
-    else:
-        # Attend que la lecture en temps reel a partir d un fichier se termine
-        await connection.await_event(qtm.QRTEvent.EventRTfromFileStopped, timeout=3600)
-
-    # Arret du streaming
-    rospy.loginfo("Shutting down...")
-    async with qtm.TakeControl(connection, PASSWORD):  # Prend le controle de QTM pour arreter le streaming
-        await connection.stream_frames_stop()
-        rospy.loginfo("Stream stopped.")
-    asyncio.get_event_loop().stop()
-    rospy.loginfo("Loop stopped.")
-
-# Fonction pour streamer les donnees de position et d orientation d un robot specifique
-async def stream_robot_pose(connection, body_name, body_index, pose_publisher: rospy.Publisher):
-    """ Streame les donnees de position et d orientation (6DoF) pour un robot donne """
-    def on_packet(packet: qtm.QRTPacket):
-        # Recupere la position et la rotation pour le robot avec l index donne
-        _, bodies = packet.get_6d()
-        pos, rot = bodies[body_index]
-
-        quat = R.from_matrix( array( rot.matrix ).reshape( (3, 3) ).T ).as_quat()
-
-        # Convertit la position lineaire en metres
-        robot_pose = PoseStamped()
-        robot_pose.pose.position.x = pos.x / 1000.0
-        robot_pose.pose.position.y = pos.y / 1000.0
-        robot_pose.pose.position.z = pos.z / 1000.0
-
-        # Convertit la rotation en quaternion
-        quat = R.from_matrix(array(rot.matrix).reshape((3, 3)).T).as_quat()
-        robot_pose.pose.orientation.x = quat[0]
-        robot_pose.pose.orientation.y = quat[1]
-        robot_pose.pose.orientation.z = quat[2]
-        robot_pose.pose.orientation.w = quat[3]
-
-        # Ajoute des metadonnees au message
-        robot_pose.header.seq = packet.framenumber
-        robot_pose.header.frame_id = "map"
-
-        # Publie les donnees sur le topic ROS
-        pose_publisher.publish(robot_pose)
-        
-
-    # Configure QTM pour streamer les donnees en continu
-    rospy.loginfo(f"Starting streaming frames for 6DoF {body_name} on topic {pose_publisher.name}")
-    await connection.stream_frames(components=COMPONENTS, on_packet=on_packet)
-
-# Fonction principale pour gerer la connexion à QTM et le streaming pour tous les robots
+# Fonction principale de streaming avec un seul on_packet
 async def main():
     global REAL_TIME
 
-    # Connexion a QTM
-    rospy.loginfo(f"Trying to connect to {QTM_IP}:{PORT} v{VERSION}...")
+    # Connexion à QTM
+    rospy.loginfo(f"Connecting to {QTM_IP}:{PORT}...")
     connection = await qtm.connect(QTM_IP, PORT, VERSION)
 
     if connection is None:
-        rospy.logerr("Failed to connect.")
+        rospy.logerr("Failed to connect to QTM.")
         quit()
-    else:
-        rospy.loginfo("Connection successful.")
 
-    # Prend le controle de QTM pour configurer le streaming
+    rospy.loginfo("Connected to QTM.")
+
+    # Prendre le contrôle de QTM
     async with qtm.TakeControl(connection, PASSWORD):
         if REAL_TIME:
-            rospy.logwarn(f"Please start recording on QTM machine ({QTM_IP})...")
+            rospy.loginfo("Waiting for QTM recording to start...")
             await connection.new()
-            await connection.await_event(qtm.QRTEvent.EventCaptureStarted) 
-            rospy.loginfo("Recording started.")
+            await connection.await_event(qtm.QRTEvent.EventCaptureStarted)
         else:
             rospy.loginfo("Starting playback...")
             await connection.start(rtfromfile=True)
-            rospy.loginfo("Playback started.")
 
-    # Recupere les parametres de la scene QTM
-    rospy.loginfo("Getting scene parameters...")
+    # Récupérer les paramètres des rigid bodies
+    rospy.loginfo("Getting rigid body parameters...")
     xml_string = await connection.get_parameters(parameters=["6d"])
     body_index = create_body_index(xml_string)
 
-    # Configure les publishers et les taches pour chaque robot
-    publishers = {}
-    tasks = []
-    for i in range(0, NUM_ROBOTS ):  # Boucle pour gerer chaque robot
-        body_name = f"{ROBOT_PREFIX}{i}"  # Genere dynamiquement le nom du rigid body
+    # Préparer les publishers pour chaque robot
+    publishers = []
+    for i in range(1, NUM_ROBOTS + 1):
+        body_name = f"{ROBOT_PREFIX}{i}"
         if body_name not in body_index:
             rospy.logerr(f"Body name {body_name} not found in QTM!")
             continue
-        index = body_index[body_name]
-        topic_name = f"{ROBOT_PREFIX}{i}/6dof_pose"  # Topic ROS pour publier les poses
-        publishers[body_name] = rospy.Publisher(topic_name, PoseStamped, queue_size=10)
-        # Ajoute une tache asynchrone pour streamer les donnees de ce robot
-        tasks.append(stream_robot_pose(connection, body_name, index, publishers[body_name]))
+        topic_name = f"/{ROBOT_PREFIX}{i}/6dof_pose"
+        publishers.append(rospy.Publisher(topic_name, PoseStamped, queue_size=10))
 
-    # Execute toutes les taches de streaming en parallele
-    await asyncio.gather(*tasks)
+    # Vérifier qu'on a bien des publishers
+    if not publishers:
+        rospy.logerr("No valid robots found. Exiting...")
+        quit()
 
-    # Ajoute une tache pour gerer l arret du streaming
-    asyncio.ensure_future(shutdown(connection))
+    # Fonction unique pour gérer tous les robots
+    def on_packet(packet: qtm.QRTPacket):
+        _, bodies = packet.get_6d()
+        for i, publisher in enumerate(publishers):
+            # Vérifie que l'index existe pour éviter des erreurs
+            if i >= len(bodies):
+                rospy.logwarn(f"Index {i} not found in packet. Skipping...")
+                continue
 
-# Point d entree principal
+            pos, rot = bodies[i]
+            pose = PoseStamped()
+
+            # Position en mètres
+            pose.pose.position.x = pos.x / 1000.0
+            pose.pose.position.y = pos.y / 1000.0
+            pose.pose.position.z = pos.z / 1000.0
+
+            # Orientation en quaternions
+            quat = R.from_matrix(array(rot.matrix).reshape((3, 3))).as_quat()
+            pose.pose.orientation.x = quat[0]
+            pose.pose.orientation.y = quat[1]
+            pose.pose.orientation.z = quat[2]
+            pose.pose.orientation.w = quat[3]
+
+            # Métadonnées
+            pose.header.seq = packet.framenumber
+            pose.header.frame_id = "map"
+
+            # Publie sur le topic correspondant
+            publisher.publish(pose)
+
+    # Démarrer le streaming des frames
+    rospy.loginfo("Starting streaming...")
+    await connection.stream_frames(components=COMPONENTS, on_packet=on_packet)
+
 if __name__ == "__main__":
-    rospy.init_node("qtm_multi_robot")  # Initialise le noeud ROS
-    asyncio.ensure_future(main())  # Demarre la tache principale
-    asyncio.get_event_loop().run_forever()  # Boucle principale pour gerer les taches asynchrones
+    rospy.init_node("qtm_multi_robot")
+    asyncio.ensure_future(main())
+    asyncio.get_event_loop().run_forever()
+
+
