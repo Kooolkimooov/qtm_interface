@@ -1,31 +1,21 @@
 <?xml version="1.0"?>
 <launch>
 
-    <!-- Déclaration d'un argument 'num_robots' pour définir dynamiquement le nombre de robots -->
-    <!-- L'utilisateur peut passer ce paramètre en ligne de commande ou utiliser la valeur par
-    défaut -->
-    <arg name="num_robots" default="3" />
+    <arg
+            name="interface_args"
+            doc="use '-h' or '--help' for more information"
+    />
 
-    <!-- Groupe global pour organiser les noeuds associés à QTM -->
     <group ns="qtm">
-        <!-- Définit un paramètre ROS global pour stocker le nombre de robots -->
-        <param name="num_robots" value="$(arg num_robots)" />
-
-        <!-- Crée un noeud unique pour gérer QTM -->
-        <!-- Ce noeud est un script Python qui sera lancé dans le package 'qtm_interface' -->
-        
-        <!-- Ne relance pas automatiquement le noeud s'il plante -->
-        <!-- Nom du noeud ROS -->
-        <!-- Nom du package ROS contenant le script -->
-        <!-- Nom du fichier exécuté -->
-        <!-- Affiche les messages dans la console -->
 
         <node
-                respawn="false"
-                name="qtm_interface"
                 pkg="qtm_interface"
+                name="qtm_interface"
                 type="qtm_interface.py"
+                required="true"
+                respawn="false"
                 output="screen"
+                args="$(arg interface_args)"
         />
 
     </group>
