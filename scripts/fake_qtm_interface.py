@@ -4,6 +4,7 @@ from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 
 from numpy import zeros
 
+from copy import deepcopy
 import rospy
 from geometry_msgs.msg import PoseStamped
 from pympc.models.dynamics.bluerov import Bluerov
@@ -74,6 +75,36 @@ def parse_arguments() -> Namespace:
 
   return parser.parse_known_args()[ 0 ]
 
+class Simulation:
+  def __init__(self, robot_type, robot_name, robot_command_topic, water_surface_depth):
+    rospy.loginfo( f"simulating {robot_type} on topic /qtm/pose/{robot_name} with input from /{robot_command_topic}" )
+    
+    self.robot_type = robot_type
+    self.robot_name = robot_name
+    self.robot_command_topic = robot_command_topic
+
+    self.simulator = Bluerov
+    self.interface = BaseInterface
+
+    if robot_type == 'bluerov':
+      self.simulator = Bluerov( water_surface_depth = water_surface_depth, reference_frame = 'ENU' )
+      self.interface = BluerovROSInterface
+    elif robot_type == 'turtlebot':
+      self.simulator = Turtlebot()
+      self.interface = TurtlebotROSInterface
+    else:
+      raise ValueError
+
+    self.state = self.interface.initial_state
+    self.actuation = zeros( self.simulator.actuation_size )
+    self.pose = PoseStamped()
+    self.pose.header.frame_id = "map"
+    self.publisher = rospy.Publisher( f'pose/{self.robot_name}', PoseStamped, queue_size = 10 )
+    self.listener = rospy.Subscriber( f'/{self.robot_command_topic}', self.interface.command_type, self.callback )
+
+  def callback(self, payload ):
+    self.actuation = self.interface.actuation_from_ros_actuation( payload )
+
 
 def publish_fake_packets( args: Namespace ):
 
@@ -87,48 +118,19 @@ def publish_fake_packets( args: Namespace ):
   if 'bluerov' in args.robot_type:
     rospy.loginfo( f"Simulating water surface depth at {args.water_surface_depth}" )
 
-  fake_robots = { }
+  fake_robots = []
 
-  for type, name, command in zip( args.robot_type, args.robot_name, args.robot_command_topic ):
-    rospy.loginfo( f"simulating {type} on topic /qtm/pose/{name} with input from /{command}" )
-
-    simulator = Bluerov
-    interface = BaseInterface
-
-    if type == 'bluerov':
-      simulator = Bluerov( water_surface_depth = args.water_surface_depth, reference_frame = 'ENU' )
-      interface = BluerovROSInterface
-    elif type == 'turtlebot':
-      simulator = Turtlebot()
-      interface = TurtlebotROSInterface
-    else:
-      raise ValueError
-
-    state = interface.initial_state
-    pose = PoseStamped()
-    pose.header.frame_id = "map"
-
-    def callback( payload ):
-      fake_robots[ name ][ 'actuation' ] = interface.actuation_from_ros_actuation( payload )
-
-    fake_robots[ name ] = {
-        'simulator': simulator,
-        'interface': interface,
-        'state'    : state,
-        'actuation': zeros( simulator.actuation_size ),
-        'publisher': rospy.Publisher( f'pose/{name}', PoseStamped, queue_size = 10 ),
-        'listener' : rospy.Subscriber( f'/{command}', interface.command_type, callback ),
-        'pose'     : pose
-        }
+  for robot_type, robot_name, robot_command_topic in zip( args.robot_type, args.robot_name, args.robot_command_topic ):
+    fake_robots += [Simulation(robot_type, robot_name, robot_command_topic, args.water_surface_depth)]
 
   rate = rospy.Rate( 100. )
 
   while not rospy.is_shutdown():
-    for robot in fake_robots.values():
-      robot[ 'state' ] = runge_kutta_4( robot[ 'simulator' ], 0.01, robot[ 'state' ], robot[ 'actuation' ] )
-      robot[ 'pose' ].pose = robot[ 'interface' ].ros_pose_from_state( robot[ 'state' ] )
-      robot[ 'pose' ].header.seq += 1
-      robot[ 'publisher' ].publish( robot[ 'pose' ] )
+    for robot in fake_robots:
+      robot.state = runge_kutta_4( robot.simulator, 0.01, robot.state, robot.actuation )
+      robot.pose.pose = robot.interface.ros_pose_from_state( robot.state )
+      robot.pose.header.seq += 1
+      robot.publisher.publish( robot.pose )
 
     rate.sleep()
 
