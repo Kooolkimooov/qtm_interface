@@ -139,9 +139,12 @@ async def main( args: Namespace ):
   # Take control of qtm, context manager will automatically release control after scope end
   async with qtm_rt.TakeControl( connection, args.qtm_password ):
 
+
     if not args.from_file:
       await connection.new()
+      await connection.await_event(qtm_rt.QRTEvent.EventConnected)
 
+    
     await connection.start( rtfromfile = args.from_file )
 
   robots = { }
