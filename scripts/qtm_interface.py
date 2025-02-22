@@ -114,7 +114,9 @@ def create_body_index( xml_string ):
 async def shutdown( args: Namespace, connection: qtm_rt.QRTConnection ):
   rospy.loginfo( "stopping QTMRT ..." )
   async with qtm_rt.TakeControl( connection, args.qtm_password ):
+
     await connection.stop()
+    
     if args.save_on_qtm:
       try: 
         # connection.save() will throw because the filename is not provided
@@ -122,10 +124,9 @@ async def shutdown( args: Namespace, connection: qtm_rt.QRTConnection ):
         # TODO: implement option to save as 
         rospy.loginfo( "saving file on QTM ..." )
         await connection.save()
+
       except: pass
-    if not args.from_file:
-      rospy.loginfo( "closing recording on QTM ..." )
-      await connection.close()
+
   rospy.loginfo("done.")
 
 
