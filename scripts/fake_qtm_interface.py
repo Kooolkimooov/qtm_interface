@@ -7,13 +7,13 @@ from numpy import zeros
 from copy import deepcopy
 import rospy
 from geometry_msgs.msg import PoseStamped
+from pympc.models.model import Model
 from pympc.models.dynamics.bluerov import Bluerov
 from pympc.models.dynamics.turtlebot import Turtlebot
 from pympc.models.model import runge_kutta_4
 from pympc.models.ros_interface.base_interface import BaseInterface
 from pympc.models.ros_interface.bluerov import BluerovROSInterface
 from pympc.models.ros_interface.turtlebot import TurtlebotROSInterface
-from rostopic import publish_message
 
 ROBOT_TYPE = [ 'bluerov', 'turtlebot' ]
 
@@ -21,7 +21,7 @@ ROBOT_TYPE = [ 'bluerov', 'turtlebot' ]
 def parse_arguments() -> Namespace:
   parser = ArgumentParser( formatter_class = RawDescriptionHelpFormatter )
 
-  parser.description = (f"Simulate an arbitrary amount of robots of type {ROBOT_TYPE} while taking in commands from  "
+  parser.description = (f"Simulate an arbitrary amount of robots of type {ROBOT_TYPE} while taking in commands from "
                         f"given topic and publishing the resulting pose to a given topic inside the /qtm namespace "
                         f"to simulate a robot, this program needs the following arguments:\n"
                         f"--robot-type\n--robot-name\n--robot-command-topic\n"
@@ -75,7 +75,7 @@ def parse_arguments() -> Namespace:
 
   return parser.parse_known_args()[ 0 ]
 
-class Simulation:
+class Simulation(Model):
   def __init__(self, robot_type, robot_name, robot_command_topic, water_surface_depth):
     rospy.loginfo( f"simulating {robot_type} on topic /qtm/pose/{robot_name} with input from /{robot_command_topic}" )
     
@@ -83,27 +83,27 @@ class Simulation:
     self.robot_name = robot_name
     self.robot_command_topic = robot_command_topic
 
-    self.simulator = Bluerov
-    self.interface = BaseInterface
+    dynamics = None
+    self.interface = None
 
     if robot_type == 'bluerov':
-      self.simulator = Bluerov( water_surface_depth = water_surface_depth, reference_frame = 'ENU' )
+      dynamics = Bluerov( water_surface_depth = water_surface_depth, reference_frame = 'ENU' )
       self.interface = BluerovROSInterface
     elif robot_type == 'turtlebot':
-      self.simulator = Turtlebot()
+      dynamics = Turtlebot()
       self.interface = TurtlebotROSInterface
     else:
       raise ValueError
+    
+    self.model = Model(dynamics, 0.01, deepcopy(self.interface.initial_state), zeros(dynamics.actuation_size))
 
-    self.state = self.interface.initial_state
-    self.actuation = zeros( self.simulator.actuation_size )
     self.pose = PoseStamped()
     self.pose.header.frame_id = "map"
     self.publisher = rospy.Publisher( f'pose/{self.robot_name}', PoseStamped, queue_size = 10 )
     self.listener = rospy.Subscriber( f'/{self.robot_command_topic}', self.interface.command_type, self.callback )
 
   def callback(self, payload ):
-    self.actuation = self.interface.actuation_from_ros_actuation( payload )
+    self.model.actuation = self.interface.actuation_from_ros_actuation( payload )
 
 
 def publish_fake_packets( args: Namespace ):
@@ -127,8 +127,8 @@ def publish_fake_packets( args: Namespace ):
 
   while not rospy.is_shutdown():
     for robot in fake_robots:
-      robot.state = runge_kutta_4( robot.simulator, 0.01, robot.state, robot.actuation )
-      robot.pose.pose = robot.interface.ros_pose_from_state( robot.state )
+      robot.model.step()
+      robot.pose.pose = robot.interface.ros_pose_from_state( robot.model.state )
       robot.pose.header.seq += 1
       robot.publisher.publish( robot.pose )
 
