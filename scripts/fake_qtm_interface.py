@@ -116,7 +116,7 @@ def publish_fake_packets( args: Namespace ):
            f"--robot-command-topic: {args.robot_command_topic} \n")
 
   if 'bluerov' in args.robot_type:
-    rospy.loginfo( f"Simulating water surface depth at {args.water_surface_depth}" )
+    rospy.loginfo( f"simulating water surface depth at {args.water_surface_depth}" )
 
   fake_robots = []
 

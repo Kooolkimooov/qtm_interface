@@ -6,11 +6,11 @@ from argparse import ArgumentParser, Namespace
 from signal import SIGINT, signal
 
 import qtm_rt
-from numpy import array
+from numpy import array, isnan, eye
 from scipy.spatial.transform import Rotation
 
 import rospy
-from geometry_msgs.msg import Point, PoseStamped
+from geometry_msgs.msg import Point, PoseWithCovarianceStamped
 from visualization_msgs.msg import Marker
 
 
@@ -154,7 +154,7 @@ async def main( args: Namespace ):
     await connection.start( rtfromfile = args.from_file )
 
   robots = { }
-  components = [ "6d" ] + ([ "3dnolabels" ] if args.track_unlabelled else [ ])
+  components = [ "6dres" ] + ([ "3dnolabels" ] if args.track_unlabelled else [ ])
   rospy.loginfo( f'tracking components: {components}' )
 
   params = await connection.get_parameters( parameters = [ "6d" ] )
@@ -185,10 +185,10 @@ async def main( args: Namespace ):
     unlabelled_msg.scale.z = .1
 
   for name in args.robot_name:
-    robots[ name ] = rospy.Publisher( f'pose/{name}', PoseStamped, queue_size = 10 )
-    rospy.loginfo( f'publishing {name} on topic /qtm/pose/{name}' )
+    robots[ name ] = rospy.Publisher( f'{name}', PoseWithCovarianceStamped, queue_size = 10 )
+    rospy.loginfo( f'publishing {name} on topic /qtm/{name}' )
 
-  pose = PoseStamped()
+  pose = PoseWithCovarianceStamped()
   pose.header.frame_id = "map"
 
   rate = rospy.Rate( 100. )
@@ -203,21 +203,26 @@ async def main( args: Namespace ):
         unlabelled_msg.points += [ Point( marker.x / 1000., marker.y / 1000, marker.z / 1000. ) ]
       unlabelled_publisher.publish( unlabelled_msg )
 
-    _, bodies = packet.get_6d()
+    _, bodies = packet.get_6d_residual()
     for name, publisher in robots.items():
-      position, rotation_matrix = bodies[ wanted_body_index[ name ] ]
+      position, rotation_matrix, residual = bodies[ wanted_body_index[ name ] ]
+
+      if any(isnan(position)): continue
+
       quaternion = Rotation.from_matrix( array( rotation_matrix ).reshape( (3, 3) ).T ).as_quat()
 
       pose.header.seq = packet.framenumber
+      pose.pose.covariance = (residual * eye(6, dtype=float) / 1000.).flatten().tolist()
+      
+      pose.pose.pose.position.x = position.x / 1000.
+      pose.pose.pose.position.y = position.y / 1000.
+      pose.pose.pose.position.z = position.z / 1000.
+      pose.pose.pose.orientation.x = quaternion[ 0 ]
+      pose.pose.pose.orientation.y = quaternion[ 1 ]
+      pose.pose.pose.orientation.z = quaternion[ 2 ]
+      pose.pose.pose.orientation.w = quaternion[ 3 ]
 
-      pose.pose.position.x = position.x / 1000.
-      pose.pose.position.y = position.y / 1000.
-      pose.pose.position.z = position.z / 1000.
-      pose.pose.orientation.x = quaternion[ 0 ]
-      pose.pose.orientation.y = quaternion[ 1 ]
-      pose.pose.orientation.z = quaternion[ 2 ]
-      pose.pose.orientation.w = quaternion[ 3 ]
-
+      pose.header.stamp = rospy.Time.now()
       publisher.publish( pose )
       rate.sleep()
 
