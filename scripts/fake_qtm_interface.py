@@ -2,11 +2,11 @@
 
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 
-from numpy import zeros
+from numpy import zeros, eye
 
 from copy import deepcopy
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from pympc.models.model import Model
 from pympc.models.dynamics.bluerov import Bluerov
 from pympc.models.dynamics.turtlebot import Turtlebot
@@ -39,7 +39,7 @@ def parse_arguments() -> Namespace:
       type = str,
       action = "append",
       help = "required; the unique name of the robot to be simulated, will be used as a topic name : "
-             "/qtm/pose/<ROBOT-NAME>; must be accompanied by -t and -c values"
+             "/qtm/<ROBOT-NAME>; must be accompanied by -t and -c values"
       )
 
   parser.add_argument(
@@ -77,7 +77,6 @@ def parse_arguments() -> Namespace:
 
 class Simulation(Model):
   def __init__(self, robot_type, robot_name, robot_command_topic, water_surface_depth):
-    rospy.loginfo( f"simulating {robot_type} on topic /qtm/pose/{robot_name} with input from /{robot_command_topic}" )
     
     self.robot_type = robot_type
     self.robot_name = robot_name
@@ -97,14 +96,15 @@ class Simulation(Model):
     
     self.model = Model(dynamics, 0.01, deepcopy(self.interface.initial_state), zeros(dynamics.actuation_size))
 
-    self.pose = PoseStamped()
+    self.pose = PoseWithCovarianceStamped()
     self.pose.header.frame_id = "map"
-    self.publisher = rospy.Publisher( f'pose/{self.robot_name}', PoseStamped, queue_size = 10 )
+    self.publisher = rospy.Publisher( f'{self.robot_name}', PoseWithCovarianceStamped, queue_size = 10 )
     self.listener = rospy.Subscriber( f'/{self.robot_command_topic}', self.interface.command_type, self.callback )
+
+    rospy.loginfo( f"simulating {robot_type} on topic {self.publisher.resolved_name} with input from {self.listener.resolved_name}" )
 
   def callback(self, payload ):
     self.model.actuation = self.interface.actuation_from_ros_actuation( payload )
-
 
 def publish_fake_packets( args: Namespace ):
 
@@ -128,8 +128,10 @@ def publish_fake_packets( args: Namespace ):
   while not rospy.is_shutdown():
     for robot in fake_robots:
       robot.model.step()
-      robot.pose.pose = robot.interface.ros_pose_from_state( robot.model.state )
+      robot.pose.pose.pose = robot.interface.ros_pose_from_state( robot.model.state )
       robot.pose.header.seq += 1
+      robot.pose.pose.covariance = (0.01 * eye(6, dtype=float)).flatten().tolist()
+      robot.pose.header.stamp = rospy.Time.now()
       robot.publisher.publish( robot.pose )
 
     rate.sleep()
