@@ -32,7 +32,7 @@ def parse_arguments() -> Namespace:
       type = str,
       action = "append",
       help = "required; the unique name of the robot to be tracked, will be used as a topic name : "
-             "/qtm/pose/<ROBOT-NAME>, may be repeated to track multiple robots"
+             "/qtm/<ROBOT-NAME>, may be repeated to track multiple robots"
       )
   parser.add_argument(
       "--qtm-ip",
