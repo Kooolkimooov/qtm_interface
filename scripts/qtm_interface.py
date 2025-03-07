@@ -166,9 +166,6 @@ async def main( args: Namespace ):
     rospy.logwarn(
         f"not all wanted robots present in qtm frame:\nwanted: {args.robot_name}; tracked: {wanted_body_index}"
         )
-  elif len( wanted_body_index ) == 0:
-    rospy.logerr( "no body tracked, shutting down" )
-    return connection
 
   if args.track_unlabelled:
     unlabelled_publisher = rospy.Publisher( "unlabelled_markers", Marker, queue_size = 10 )
@@ -211,7 +208,6 @@ async def main( args: Namespace ):
 
       quaternion = Rotation.from_matrix( array( rotation_matrix ).reshape( (3, 3) ).T ).as_quat()
 
-      pose.header.seq = packet.framenumber
       pose.pose.covariance = (residual * eye(6, dtype=float) / 1000.).flatten().tolist()
       
       pose.pose.pose.position.x = position.x / 1000.
@@ -222,6 +218,7 @@ async def main( args: Namespace ):
       pose.pose.pose.orientation.z = quaternion[ 2 ]
       pose.pose.pose.orientation.w = quaternion[ 3 ]
 
+      pose.header.seq = packet.framenumber
       pose.header.stamp = rospy.Time.now()
       publisher.publish( pose )
       rate.sleep()
