@@ -87,10 +87,10 @@ class Simulation(Model):
 
     if robot_type == 'bluerov':
       dynamics = Bluerov( water_surface_depth = water_surface_depth, reference_frame = 'ENU' )
-      self.interface = BluerovROSInterface
+      self.interface = BluerovROSInterface()
     elif robot_type == 'turtlebot':
       dynamics = Turtlebot()
-      self.interface = TurtlebotROSInterface
+      self.interface = TurtlebotROSInterface()
     else:
       raise ValueError
     
