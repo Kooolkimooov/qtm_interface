@@ -8,10 +8,10 @@ from copy import deepcopy
 import rospy
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from pympc.models.model import Model
+from pympc.models.dynamics.dynamics import Dynamics
 from pympc.models.dynamics.bluerov import Bluerov
 from pympc.models.dynamics.turtlebot import Turtlebot
-from pympc.models.model import runge_kutta_4
-from pympc.models.ros_interface.base_interface import BaseInterface
+from pympc.models.ros_interface.interface import Interface
 from pympc.models.ros_interface.bluerov import BluerovROSInterface
 from pympc.models.ros_interface.turtlebot import TurtlebotROSInterface
 
@@ -82,8 +82,8 @@ class Simulation(Model):
     self.robot_name = robot_name
     self.robot_command_topic = robot_command_topic
 
-    dynamics = None
-    self.interface = None
+    dynamics = Dynamics()
+    self.interface = Interface()
 
     if robot_type == 'bluerov':
       dynamics = Bluerov( water_surface_depth = water_surface_depth, reference_frame = 'ENU' )

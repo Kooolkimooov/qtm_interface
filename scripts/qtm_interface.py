@@ -119,8 +119,6 @@ async def shutdown( args: Namespace, connection: qtm_rt.QRTConnection ):
     
     if args.save_on_qtm:
       try: 
-        # connection.save() will throw because the filename is not provided
-        # however QTM will still save with the incrementing filename feature
         # TODO: implement option to save as 
         rospy.loginfo( "saving file on QTM ..." )
         await connection.save()
