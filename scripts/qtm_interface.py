@@ -88,6 +88,15 @@ def parse_arguments() -> Namespace:
       help = "default=False; wether to save the capture on the QTM computer on shutdown"
       )
   parser.add_argument(
+    "--save-file-name",
+    "-sn",
+    required = False,
+    type = str,
+    action = "store",
+    default = "rt_measurement",
+    help = "default=rt_measurement; the name of the file to be saved when --save-on-qtm is used"
+    )
+  parser.add_argument(
       "--track-unlabelled",
       "-u",
       required = False,
@@ -115,13 +124,15 @@ async def shutdown( args: Namespace, connection: qtm_rt.QRTConnection ):
   rospy.loginfo( "stopping QTMRT ..." )
   async with qtm_rt.TakeControl( connection, args.qtm_password ):
 
+    rospy.loginfo( "stopping measurement ..." )
     await connection.stop()
+    await connection.await_event( qtm_rt.QRTEvent.EventCaptureStopped )
     
     if args.save_on_qtm:
       try: 
-        # TODO: implement option to save as 
         rospy.loginfo( "saving file on QTM ..." )
-        await connection.save()
+        await connection.save( args.save_file_name )
+        rospy.loginfo( f"file saved as {args.save_file_name}" )
 
       except: pass
 
